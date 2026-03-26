@@ -2,16 +2,20 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>2026 紫色生活流水帳 - Web App 版</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>2026 紫色生活流水帳</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body {
-            background-color: #f5f3ff;
+            background-color: #f8f7ff;
             font-family: 'PingFang TC', 'Microsoft JhengHei', sans-serif;
+            -webkit-tap-highlight-color: transparent;
         }
         .glass-header {
-            background: rgba(139, 92, 246, 0.9);
+            background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+            position: sticky;
+            top: 0;
+            z-index: 50;
         }
         .day-card {
             transition: transform 0.2s;
@@ -25,155 +29,79 @@
             background: transparent;
             border: none;
             width: 100%;
-            font-size: 10px;
-            color: #9ca3af;
-            font-weight: bold;
-            text-transform: uppercase;
+            font-size: 11px;
+            color: #64748b;
+            font-weight: 600;
+            text-align: center;
             outline: none;
-            padding: 0 4px;
         }
         .item-note-input {
-            font-size: 10px;
+            font-size: 11px;
             padding: 2px 8px;
-            border-radius: 6px;
+            border-radius: 8px;
             border: 1px dashed #ddd;
             width: 100%;
-            margin-bottom: 2px;
+            margin-bottom: 4px;
             outline: none;
             background: #fff;
         }
     </style>
 </head>
 <body class="min-h-screen pb-20">
-    <!-- 頂部統計欄 -->
-    <header class="glass-header text-white shadow-lg p-4 md:p-6 mb-6">
-        <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
-            <div class="flex flex-col items-start justify-center">
+    <!-- 頂部統計欄 (保留您喜歡的大標題樣式) -->
+    <header class="glass-header text-white shadow-xl p-5 mb-6">
+        <div class="max-w-5xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+            <div class="flex flex-col items-start">
                 <h1 class="text-2xl font-bold leading-tight">💜 2026 錢包流水帳 Web App</h1>
                 <div class="flex items-center gap-2 mt-1">
-                    <p class="text-purple-100 text-sm opacity-90 font-medium">雲端同步中...</p>
-                    <span id="authStatus" class="inline-block w-2 h-2 rounded-full bg-yellow-400"></span>
+                    <p id="syncStatus" class="text-purple-100 text-sm opacity-90 font-medium">資料已就緒</p>
+                    <span id="statusDot" class="inline-block w-2 h-2 rounded-full bg-green-400"></span>
                 </div>
-                <p id="displayUid" class="text-[10px] text-purple-200 mt-1 font-mono"></p>
             </div>
-            <div class="flex gap-4 md:gap-8 text-center items-center">
+            <div class="flex gap-8 text-center items-center">
                 <div class="flex flex-col items-end">
                     <span class="text-[10px] opacity-80 uppercase tracking-wider">今日支出</span>
-                    <span class="text-xl md:text-2xl font-black" id="totalExpenseToday">$ 0</span>
+                    <span class="text-2xl font-black" id="totalExpenseToday">$ 0</span>
                 </div>
                 <div class="border-l border-purple-400 h-8"></div>
                 <div class="flex flex-col items-end">
                     <span class="text-[10px] opacity-80 uppercase tracking-wider">錢包餘額</span>
-                    <span class="text-xl md:text-2xl font-black text-yellow-300" id="finalWalletBalance">$ 0</span>
+                    <span class="text-2xl font-black text-yellow-300" id="finalWalletBalance">$ 0</span>
                 </div>
             </div>
         </div>
     </header>
 
-    <main class="max-w-7xl mx-auto px-4">
+    <main class="max-w-5xl mx-auto px-4">
         <div id="expenseList" class="space-y-6">
-            <div class="flex flex-col items-center py-20 text-purple-400">
-                <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mb-4"></div>
-                <p>正在載入您的資料...</p>
-            </div>
+            <!-- JS 動態生成內容 -->
         </div>
     </main>
 
-    <div id="saveIndicator" class="fixed bottom-6 right-6 bg-purple-600 text-white px-4 py-2 rounded-full shadow-lg opacity-0 transition-opacity duration-300 pointer-events-none z-50 flex items-center gap-2">
-        <svg class="animate-spin h-4 w-4 text-white" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-        同步中...
-    </div>
-
-    <!-- Firebase SDKs -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, getDoc, setDoc, onSnapshot, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-        // Firebase 配置與初始化
-        const firebaseConfig = JSON.parse(__firebase_config);
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-
-        const expenseList = document.getElementById('expenseList');
-        const totalExpenseTodayDisplay = document.getElementById('totalExpenseToday');
-        const finalWalletBalanceDisplay = document.getElementById('finalWalletBalance');
-        const saveIndicator = document.getElementById('saveIndicator');
-
+    <script>
+        // 設定與資料初始
         const START_DATE = new Date('2026-03-26');
         const END_DATE = new Date('2026-12-31');
-        
+        const STORAGE_KEY = 'expense_app_v2_local';
+        const LABELS_KEY = 'expense_labels_v2_local';
+
         const defaultCategories = [
             { key: 'breakfast', label: '早餐', icon: '🥐', editable: false, hasNote: false },
             { key: 'lunch', label: '午餐', icon: '🍱', editable: false, hasNote: false },
             { key: 'dinner', label: '晚餐', icon: '🥘', editable: false, hasNote: false },
             { key: 'drink', label: '飲料', icon: '🧋', editable: false, hasNote: false },
             { key: 'smoke', label: '煙', icon: '🚬', editable: false, hasNote: false },
-            { key: 'others', label: '其他1', icon: '🎀', editable: true, hasNote: true },
-            { key: 'others2', label: '其他2', icon: '🌸', editable: true, hasNote: true },
-            { key: 'others3', label: '其他3', icon: '🌷', editable: true, hasNote: true },
-            { key: 'card1', label: '刷卡1', icon: '💳', editable: true, hasNote: true },
-            { key: 'card2', label: '刷卡2', icon: '💳', editable: true, hasNote: true }
+            { key: 'others', label: '自訂1', icon: '🎀', editable: true, hasNote: true },
+            { key: 'others2', label: '自訂2', icon: '🌸', editable: true, hasNote: true },
+            { key: 'others3', label: '自訂3', icon: '🌷', editable: true, hasNote: true },
+            { key: 'card1', label: '刷卡A', icon: '💳', editable: true, hasNote: true },
+            { key: 'card2', label: '刷卡B', icon: '💳', editable: true, hasNote: true }
         ];
 
-        let allData = {};
-        let customLabels = {};
-        let user = null;
+        let allData = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+        let customLabels = JSON.parse(localStorage.getItem(LABELS_KEY) || '{}');
 
-        // 登入邏輯
-        async function initAuth() {
-            try {
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
-                }
-            } catch (error) {
-                console.error("Auth error:", error);
-            }
-        }
-
-        onAuthStateChanged(auth, (u) => {
-            if (u) {
-                user = u;
-                document.getElementById('authStatus').classList.replace('bg-yellow-400', 'bg-green-400');
-                document.getElementById('displayUid').innerText = `User ID: ${user.uid}`;
-                subscribeToData();
-            }
-        });
-
-        // 訂閱雲端資料
-        function subscribeToData() {
-            if (!user) return;
-
-            // 訂閱標籤資料
-            const labelsDoc = doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'labels');
-            onSnapshot(labelsDoc, (snapshot) => {
-                if (snapshot.exists()) {
-                    customLabels = snapshot.data();
-                    renderList();
-                } else {
-                    renderList();
-                }
-            }, (error) => console.error("Snapshot error:", error));
-
-            // 訂閱消費資料
-            const dataDoc = doc(db, 'artifacts', appId, 'users', user.uid, 'data', 'all_expenses');
-            onSnapshot(dataDoc, (snapshot) => {
-                if (snapshot.exists()) {
-                    allData = snapshot.data();
-                    calculateEverything();
-                    renderList();
-                } else {
-                    allData = {};
-                    renderList();
-                }
-            }, (error) => console.error("Snapshot error:", error));
-        }
-
-        function renderList() {
+        function init() {
             let html = '';
             let current = new Date(START_DATE);
 
@@ -185,7 +113,7 @@
 
                 if (current.getDate() === 1 || dateStr === '2026-03-26') {
                     html += `
-                        <div class="pt-12 pb-4 mb-2">
+                        <div class="pt-10 pb-4">
                             <h2 class="text-3xl font-black text-purple-900 flex items-center gap-3">
                                 <span class="bg-purple-600 text-white px-3 py-1 rounded-2xl text-xl">2026</span>
                                 ${monthName}
@@ -198,75 +126,47 @@
                 const dayData = allData[dateStr] || {};
                 
                 html += `
-                    <div class="day-card bg-white rounded-3xl p-5 shadow-sm border border-purple-100">
+                    <div class="day-card bg-white rounded-[2rem] p-6 shadow-sm border border-purple-100">
                         <div class="flex flex-col xl:flex-row gap-6">
                             <div class="min-w-[120px] ${isWeekend ? 'text-red-500' : 'text-purple-600'}">
-                                <div class="text-lg font-bold">${dateStr}</div>
-                                <div class="text-sm opacity-75 italic">星期${dayOfWeek}</div>
+                                <div class="text-xl font-bold">${dateStr}</div>
+                                <div class="text-sm opacity-75 italic font-medium">星期${dayOfWeek}</div>
                             </div>
                             
-                            <div class="w-full xl:w-96 grid grid-cols-2 gap-3 p-3 bg-purple-50 rounded-2xl border border-purple-100">
-                                <div class="col-span-2 text-[10px] font-bold text-purple-400 uppercase tracking-wider px-1">錢包狀態</div>
+                            <div class="w-full xl:w-96 grid grid-cols-2 gap-3 p-4 bg-purple-50 rounded-2xl border border-purple-100">
+                                <div class="col-span-2 text-[11px] font-bold text-purple-400 uppercase tracking-wider mb-1">錢包預算管理</div>
                                 <div class="relative">
-                                    <label class="text-[10px] text-blue-900 mb-1 block pl-1 font-bold">錢包目前有多少</label>
-                                    <span class="absolute left-2 top-8 text-xs">👛</span>
-                                    <input type="number" 
-                                           data-date="${dateStr}" 
-                                           data-type="walletBase" 
-                                           value="${dayData.walletBase || ''}" 
-                                           placeholder="輸入總額"
-                                           class="data-input w-full pl-7 pr-2 py-2 bg-white rounded-xl text-sm border border-purple-200 outline-none transition font-semibold text-purple-800">
+                                    <label class="text-[10px] text-blue-900 mb-1 block pl-1 font-bold">總錢包餘額</label>
+                                    <input type="number" oninput="updateData('${dateStr}','base',this.value)" value="${dayData.base || ''}" placeholder="0"
+                                           class="w-full px-3 py-2 bg-white rounded-xl text-sm border border-purple-200 outline-none font-bold text-purple-800">
                                 </div>
                                 <div class="relative">
-                                    <label class="text-[10px] text-blue-400 mb-1 block pl-1 text-blue-500">拿多少錢出來用</label>
-                                    <span class="absolute left-2 top-8 text-xs">💰</span>
-                                    <input type="number" 
-                                           data-date="${dateStr}" 
-                                           data-type="withdraw" 
-                                           value="${dayData.withdraw || ''}" 
-                                           placeholder="領取金額"
-                                           class="data-input w-full pl-7 pr-2 py-2 bg-blue-50 rounded-xl text-sm border border-blue-200 outline-none transition font-bold text-blue-700">
+                                    <label class="text-[10px] text-blue-400 mb-1 block pl-1 font-bold">今日領多少用</label>
+                                    <input type="number" oninput="updateData('${dateStr}','draw',this.value)" value="${dayData.draw || ''}" placeholder="0"
+                                           class="w-full px-3 py-2 bg-blue-50/50 rounded-xl text-sm border border-blue-200 outline-none font-bold text-blue-700">
                                 </div>
                                 <div class="col-span-2 mt-1 px-1 flex justify-between items-center text-xs">
-                                    <span class="text-gray-500">拿完後剩下:</span>
-                                    <span class="font-bold text-purple-600" id="wallet-remain-${dateStr}">$ 0</span>
+                                    <span class="text-gray-400 font-medium">拿取後錢包剩餘:</span>
+                                    <span class="font-bold text-purple-600" id="remain-${dateStr}">$ 0</span>
                                 </div>
                             </div>
 
                             <div class="flex-1">
-                                <div class="text-[11px] font-black text-purple-700 uppercase tracking-wider mb-2 px-1">今日消費項目</div>
-                                <div class="grid grid-cols-2 sm:grid-cols-5 xl:grid-cols-5 gap-2 w-full">
+                                <div class="text-[11px] font-black text-purple-700 uppercase tracking-wider mb-3 px-1">消費項目明細</div>
+                                <div class="grid grid-cols-2 sm:grid-cols-5 gap-3 w-full">
                                     ${defaultCategories.map(cat => {
-                                        const displayLabel = customLabels[cat.key] || cat.label;
-                                        const noteValue = dayData[`${cat.key}_note`] || '';
+                                        const label = customLabels[cat.key] || cat.label;
+                                        const note = dayData[`${cat.key}_n`] || '';
                                         return `
-                                        <div class="relative flex flex-col">
-                                            <input type="text" 
-                                                   value="${displayLabel}" 
-                                                   ${!cat.editable ? 'readonly' : ''}
+                                        <div class="flex flex-col">
+                                            <input type="text" value="${label}" ${!cat.editable ? 'readonly' : ''} 
                                                    onblur="updateLabel('${cat.key}', this.value)"
-                                                   class="category-label-input ${!cat.editable ? 'cursor-default' : 'cursor-pointer hover:bg-gray-100'}"
-                                                   placeholder="點擊命名">
-                                            <div class="relative mt-1">
-                                                ${cat.hasNote ? `
-                                                    <input type="text" 
-                                                           data-date="${dateStr}" 
-                                                           data-type="note"
-                                                           data-cat="${cat.key}"
-                                                           value="${noteValue}"
-                                                           placeholder="品名"
-                                                           class="data-input item-note-input text-gray-500">
-                                                ` : ''}
-                                                <div class="relative">
-                                                    <span class="absolute left-2 top-1/2 -translate-y-1/2 text-xs">${cat.icon}</span>
-                                                    <input type="number" 
-                                                           data-date="${dateStr}" 
-                                                           data-type="expense"
-                                                           data-cat="${cat.key}" 
-                                                           value="${dayData[cat.key] || ''}" 
-                                                           placeholder="金額"
-                                                           class="data-input w-full pl-7 pr-2 py-2 bg-gray-50 rounded-xl text-sm border border-transparent focus:border-purple-400 focus:bg-white outline-none transition">
-                                                </div>
+                                                   class="category-label-input ${cat.editable ? 'hover:bg-purple-100 rounded' : ''}">
+                                            ${cat.hasNote ? `<input type="text" oninput="updateData('${dateStr}','${cat.key}_n',this.value)" value="${note}" placeholder="..." class="item-note-input">` : ''}
+                                            <div class="relative">
+                                                <span class="absolute left-2 top-1/2 -translate-y-1/2 text-xs">${cat.icon}</span>
+                                                <input type="number" oninput="updateData('${dateStr}','${cat.key}',this.value)" value="${dayData[cat.key] || ''}" 
+                                                       class="w-full pl-7 pr-2 py-2 bg-gray-50 rounded-xl text-sm border border-transparent focus:border-purple-300 focus:bg-white outline-none">
                                             </div>
                                         </div>
                                         `;
@@ -274,14 +174,14 @@
                                 </div>
                             </div>
 
-                            <div class="w-full xl:w-32 flex justify-between xl:flex-col xl:justify-center gap-2 border-t xl:border-t-0 xl:border-l border-gray-100 pt-4 xl:pt-0 xl:pl-4">
+                            <div class="w-full xl:w-32 flex justify-between xl:flex-col xl:justify-center gap-2 border-t xl:border-t-0 xl:border-l border-gray-100 pt-4 xl:pt-0 xl:pl-6">
                                 <div class="xl:text-right">
-                                    <span class="text-[10px] text-gray-400 block uppercase">今日總花費</span>
-                                    <span class="font-bold text-purple-700 text-lg" id="day-expense-${dateStr}">$ 0</span>
+                                    <span class="text-[10px] text-gray-400 block font-bold uppercase">今日花費</span>
+                                    <span class="font-black text-purple-700 text-xl" id="exp-${dateStr}">$ 0</span>
                                 </div>
                                 <div class="xl:text-right">
-                                    <span class="text-[10px] text-gray-400 block uppercase">口袋剩多少</span>
-                                    <span class="font-bold text-sm" id="day-pocket-${dateStr}">$ 0</span>
+                                    <span class="text-[10px] text-gray-400 block font-bold uppercase">口袋剩餘</span>
+                                    <span class="font-bold text-sm" id="pocket-${dateStr}">$ 0</span>
                                 </div>
                             </div>
                         </div>
@@ -289,105 +189,53 @@
                 `;
                 current.setDate(current.getDate() + 1);
             }
-
-            expenseList.innerHTML = html;
-            
-            document.querySelectorAll('.data-input').forEach(input => {
-                input.addEventListener('input', debounce(handleInputChange, 1000));
-            });
-
-            calculateEverything();
+            document.getElementById('expenseList').innerHTML = html;
+            calculate();
         }
 
-        // 防抖動儲存
-        function debounce(func, wait) {
-            let timeout;
-            return function(...args) {
-                clearTimeout(timeout);
-                timeout = setTimeout(() => func.apply(this, args), wait);
-            };
+        function updateData(date, type, val) {
+            if(!allData[date]) allData[date] = {};
+            allData[date][type] = val;
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(allData));
+            calculate();
         }
 
-        async function updateLabel(key, newVal) {
-            if (!user) return;
-            customLabels[key] = newVal;
-            const labelsDoc = doc(db, 'artifacts', appId, 'users', user.uid, 'settings', 'labels');
-            showSaveIndicator(true);
-            await setDoc(labelsDoc, customLabels);
-            showSaveIndicator(false);
+        function updateLabel(key, val) {
+            customLabels[key] = val;
+            localStorage.setItem(LABELS_KEY, JSON.stringify(customLabels));
         }
 
-        async function handleInputChange(e) {
-            if (!user) return;
-            const { date, type, cat } = e.target.dataset;
-            const value = e.target.value;
-
-            if (!allData[date]) allData[date] = {};
-            
-            if (type === 'withdraw') allData[date].withdraw = value;
-            else if (type === 'walletBase') allData[date].walletBase = value;
-            else if (type === 'note') allData[date][`${cat}_note`] = value;
-            else allData[date][cat] = value;
-
-            const dataDoc = doc(db, 'artifacts', appId, 'users', user.uid, 'data', 'all_expenses');
-            showSaveIndicator(true);
-            await setDoc(dataDoc, allData);
-            showSaveIndicator(false);
-            calculateEverything();
-        }
-
-        function calculateEverything() {
-            let runningWalletBalance = 0;
+        function calculate() {
+            let runningWallet = 0;
             let current = new Date(START_DATE);
-
             while (current <= END_DATE) {
-                const dateStr = current.toISOString().split('T')[0];
-                const dayData = allData[dateStr] || {};
-                
-                let base = (dayData.walletBase !== undefined && dayData.walletBase !== '') 
-                           ? Number(dayData.walletBase) 
-                           : runningWalletBalance;
+                const ds = current.toISOString().split('T')[0];
+                const dD = allData[ds] || {};
+                let b = (dD.base !== undefined && dD.base !== '') ? Number(dD.base) : runningWallet;
+                let dr = Number(dD.draw) || 0;
+                let rem = b - dr;
+                let dayEx = 0;
+                defaultCategories.forEach(c => dayEx += (Number(dD[c.key]) || 0));
+                let pkt = dr - dayEx;
+                runningWallet = rem + pkt;
 
-                let withdraw = Number(dayData.withdraw) || 0;
-                let walletRemaining = base - withdraw;
-                
-                let dayExpense = 0;
-                defaultCategories.forEach(cat => {
-                    dayExpense += (Number(dayData[cat.key]) || 0);
-                });
-
-                let pocketRemaining = withdraw - dayExpense;
-                runningWalletBalance = walletRemaining + pocketRemaining;
-
-                const wrEl = document.getElementById(`wallet-remain-${dateStr}`);
-                const deEl = document.getElementById(`day-expense-${dateStr}`);
-                const dpEl = document.getElementById(`day-pocket-${dateStr}`);
-                
-                if (wrEl) wrEl.innerText = `$ ${walletRemaining.toLocaleString()}`;
-                if (deEl) deEl.innerText = `$ ${dayExpense.toLocaleString()}`;
-                if (dpEl) {
-                    dpEl.innerText = `$ ${pocketRemaining.toLocaleString()}`;
-                    dpEl.className = pocketRemaining < 0 ? 'font-bold text-red-500 text-sm' : 'font-bold text-green-600 text-sm';
+                if(document.getElementById(`remain-${ds}`)) document.getElementById(`remain-${ds}`).innerText = `$ ${rem.toLocaleString()}`;
+                if(document.getElementById(`exp-${ds}`)) document.getElementById(`exp-${ds}`).innerText = `$ ${dayEx.toLocaleString()}`;
+                if(document.getElementById(`pocket-${ds}`)) {
+                    const pEl = document.getElementById(`pocket-${ds}`);
+                    pEl.innerText = `$ ${pkt.toLocaleString()}`;
+                    pEl.className = pkt < 0 ? 'font-bold text-red-500 text-sm' : 'font-bold text-green-600 text-sm';
                 }
-
                 current.setDate(current.getDate() + 1);
             }
-
-            finalWalletBalanceDisplay.innerText = `$ ${runningWalletBalance.toLocaleString()}`;
-            
-            const todayStr = new Date().toISOString().split('T')[0];
-            const todayData = allData[todayStr] || {};
-            let todaySum = 0;
-            defaultCategories.forEach(cat => todaySum += (Number(todayData[cat.key]) || 0));
-            totalExpenseTodayDisplay.innerText = `$ ${todaySum.toLocaleString()}`;
+            document.getElementById('finalWalletBalance').innerText = `$ ${runningWallet.toLocaleString()}`;
+            const today = new Date().toISOString().split('T')[0];
+            let tSum = 0;
+            if(allData[today]) defaultCategories.forEach(c => tSum += (Number(allData[today][c.key]) || 0));
+            document.getElementById('totalExpenseToday').innerText = `$ ${tSum.toLocaleString()}`;
         }
 
-        function showSaveIndicator(show) {
-            saveIndicator.style.opacity = show ? '1' : '0';
-        }
-
-        window.updateLabel = updateLabel; // 暴露給 HTML 使用
-        initAuth();
+        init();
     </script>
 </body>
 </html>
